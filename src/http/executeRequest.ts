@@ -1,9 +1,19 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
+import { type RequestConfig }
+    from "../schemas/requestSchema.js";
 
-export async function executeRequest() {
-    const response = await axios.get(
-        "https://dummyjson.com/products"
-    );
+export async function executeRequest(
+    request: RequestConfig
+) {
+    return axios({
+        method: request.method,
 
-    return response;
+        url: request.url,
+
+        headers: request.headers as AxiosHeaders,
+
+        params: request.query,
+
+        data: request.body
+    });
 }

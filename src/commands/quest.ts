@@ -1,19 +1,51 @@
 import chalk from "chalk";
 import ora from "ora";
 
-import { wizard } from "../companion/index.js";
+import { companions, defaultCompanion } from "../companion/index.js";
 import { executeRequest } from "../http/executeRequest.js";
+import { generateRequest } from "../llm/llmGenerator.js";
+import { displayRequest } from "../utils/requestDisplay.js";
+import { askConfirmation } from "../utils/confirmation.js";
 
-export async function runQuest(prompt: string) {
+// Helper to select a random message from a companion's list
+function randomMessage(messages: string[]): string {
+    if (!messages.length) return "";
+    const index = Math.floor(Math.random() * messages.length);
+    return messages[index] || "";
+}
+
+export async function runQuest(prompt: string, companionType?: string) {
+    const companion = companionType
+        ? (companions[companionType.toLowerCase()] || defaultCompanion)
+        : defaultCompanion;
+
+    // Generate request config from prompt (uses LLM or falls back to mock)
+    const requestConfig = await generateRequest(prompt);
+
+    // Display the generated request detail
+    displayRequest(requestConfig);
+
+    // Prompt the user for confirmation before executing the HTTP request
+    const confirmed = await askConfirmation(
+        chalk.yellow(`⚔️  ${companion.name} asks: Execute this request? (y/N): `)
+    );
+
+    if (!confirmed) {
+        console.log(
+            chalk.blue(`❄️  ${companion.name}: ${randomMessage(companion.cancelMessages)}`)
+        );
+        return;
+    }
+
     const spinner = ora(
-        `${wizard.name}: ${wizard.loadingMessages[0]}`
+        `${companion.name}: ${randomMessage(companion.loadingMessages)}`
     ).start();
 
     try {
-        const response = await executeRequest();
+        const response = await executeRequest(requestConfig);
 
         spinner.succeed(
-            `${wizard.successMessages[0]} ${response.status}`
+            `${companion.name}: ${randomMessage(companion.successMessages)} ${response.status}`
         );
 
         console.log(
@@ -22,7 +54,7 @@ export async function runQuest(prompt: string) {
             )
         );
     } catch (error) {
-        spinner.fail(wizard.errorMessages[0]);
+        spinner.fail(`${companion.name}: ${randomMessage(companion.errorMessages)}`);
 
         console.error(error);
     }

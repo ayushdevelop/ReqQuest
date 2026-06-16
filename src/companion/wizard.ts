@@ -15,5 +15,9 @@ export const wizard = {
     errorMessages: [
         "Spell backfired!",
         "Mana depleted!"
+    ],
+
+    cancelMessages: [
+        "Spell cancelled. Safely dismissed."
     ]
 };
