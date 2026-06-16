@@ -19,5 +19,20 @@ export const samurai = {
 
     cancelMessages: [
         "Sheathing blade. Patience is a virtue."
+    ],
+
+    spinnerInterval: 100,
+
+    spinnerFrames: [
+        "⚔️ (•_•)           ",
+        "⚔️ (•_•) ═         ",
+        "⚔️ (•_•) ══        ",
+        "⚔️ (•_•) ═══       ",
+        "⚔️ (•_•) ════      ",
+        "⚔️ ( -_•) ⚔️ ═     ",
+        "⚔️ ( -_•) ⚔️ ══    ",
+        "⚔️ ( -_•) ⚔️ ═══   ",
+        "⚔️ ( -_•) ⚔️ ════  ",
+        "💥 ( >_<) ═════   "
     ]
 };

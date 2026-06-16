@@ -11,6 +11,8 @@ export interface Companion {
     successMessages: string[];
     errorMessages: string[];
     cancelMessages: string[];
+    spinnerInterval: number;
+    spinnerFrames: string[];
 }
 
 export const companions: Record<string, Companion> = {

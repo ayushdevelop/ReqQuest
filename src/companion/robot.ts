@@ -19,5 +19,20 @@ export const robot = {
 
     cancelMessages: [
         "Operation aborted. Safe state restored."
+    ],
+
+    spinnerInterval: 80,
+
+    spinnerFrames: [
+        "🤖 [■□□□□□□□□□]",
+        "🤖 [■■□□□□□□□□]",
+        "🤖 [■■■□□□□□□□]",
+        "🤖 [■■■■□□□□□□]",
+        "🤖 [■■■■■□□□□□]",
+        "🤖 [■■■■■■□□□□]",
+        "🤖 [■■■■■■■□□□]",
+        "🤖 [■■■■■■■■□□]",
+        "🤖 [■■■■■■■■■□]",
+        "🤖 [■■■■■■■■■■]"
     ]
 };

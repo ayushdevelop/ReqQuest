@@ -37,9 +37,13 @@ export async function runQuest(prompt: string, companionType?: string) {
         return;
     }
 
-    const spinner = ora(
-        `${companion.name}: ${randomMessage(companion.loadingMessages)}`
-    ).start();
+    const spinner = ora({
+        text: `${companion.name}: ${randomMessage(companion.loadingMessages)}`,
+        spinner: {
+            interval: companion.spinnerInterval,
+            frames: companion.spinnerFrames
+        }
+    }).start();
 
     try {
         const response = await executeRequest(requestConfig);

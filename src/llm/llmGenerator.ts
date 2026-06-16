@@ -3,6 +3,23 @@ import chalk from "chalk";
 import { type RequestConfig, RequestSchema } from "../schemas/requestSchema.js";
 import { generateMockRequest } from "../utils/mockGenerator.js";
 
+const SYSTEM_INSTRUCTION = `You are an API client generator companion. You convert natural language descriptions of API operations into a structured JSON configuration representing an HTTP request.
+
+Your output MUST adhere strictly to this JSON Schema:
+{
+  "method": "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  "url": "string (must be an absolute URL starting with http:// or https://)",
+  "headers": "object (Record<string, string>, optional)",
+  "query": "object (Record<string, string>, optional, representing URL query parameters)",
+  "body": "any (optional, representing the request payload)"
+}
+
+Rules:
+1. If the prompt specifies query parameters (e.g. "with token=abc" or "query param limit=10"), map them to the 'query' object.
+2. If the prompt specifies a request body payload (e.g. "body hello", "message hello", or "JSON data {foo: bar}"), map them to the 'body' field.
+3. If the prompt has headers (e.g. "header authorization bearer xyz"), map them to the 'headers' object.
+4. Output raw JSON only. Do not include markdown code block formatting (such as \`\`\`json).`;
+
 /**
  * Generates an API RequestConfig from a natural language prompt.
  * First checks for GEMINI_API_KEY or OPENAI_API_KEY in the environment.
@@ -10,13 +27,14 @@ import { generateMockRequest } from "../utils/mockGenerator.js";
  * If keys are absent or API queries fail, falls back to the local MockGenerator.
  */
 export async function generateRequest(prompt: string): Promise<RequestConfig> {
+    const groqKey = process.env["GROQ_API_KEY"];
     const geminiKey = process.env["GEMINI_API_KEY"];
     const openaiKey = process.env["OPENAI_API_KEY"];
 
-    if (!geminiKey && !openaiKey) {
+    if (!groqKey && !geminiKey && !openaiKey) {
         console.warn(
             chalk.yellow(
-                "⚠️  No GEMINI_API_KEY or OPENAI_API_KEY found in environment variables. Falling back to offline Mock Generator."
+                "⚠️  No GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY found in environment variables. Falling back to offline Mock Generator."
             )
         );
         return generateMockRequest(prompt);
@@ -25,7 +43,40 @@ export async function generateRequest(prompt: string): Promise<RequestConfig> {
     let rawJson = "";
 
     try {
-        if (geminiKey) {
+        if (groqKey) {
+            // Use Groq API (OpenAI compatible endpoint)
+            const response = await axios.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+                    model: "llama-3.3-70b-versatile",
+                    messages: [
+                        {
+                            role: "system",
+                            content: SYSTEM_INSTRUCTION
+                        },
+                        {
+                            role: "user",
+                            content: `Translate this prompt into a RequestConfig JSON: "${prompt}"`
+                        }
+                    ],
+                    response_format: {
+                        type: "json_object"
+                    }
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${groqKey}`,
+                        "Content-Type": "application/json"
+                    }
+                }
+            );
+
+            const content = response.data?.choices?.[0]?.message?.content;
+            if (!content) {
+                throw new Error("Empty response from Groq API");
+            }
+            rawJson = content;
+        } else if (geminiKey) {
             // Use Gemini API
             const response = await axios.post(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
@@ -73,7 +124,7 @@ export async function generateRequest(prompt: string): Promise<RequestConfig> {
                     systemInstruction: {
                         parts: [
                             {
-                                text: "You are an API client generator companion. You convert natural language descriptions of API operations into a structured JSON configuration representing an HTTP request."
+                                text: SYSTEM_INSTRUCTION
                             }
                         ]
                     }
@@ -99,7 +150,7 @@ export async function generateRequest(prompt: string): Promise<RequestConfig> {
                     messages: [
                         {
                             role: "system",
-                            content: "You are an API client generator companion. You convert natural language descriptions of API operations into a structured JSON configuration representing an HTTP request."
+                            content: SYSTEM_INSTRUCTION
                         },
                         {
                             role: "user",

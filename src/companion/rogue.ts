@@ -19,5 +19,18 @@ export const rogue = {
 
     cancelMessages: [
         "Sneaking away. Operation aborted!"
+    ],
+
+    spinnerInterval: 120,
+
+    spinnerFrames: [
+        "👤 🗝️  .       ",
+        "👤  🗝️ .      ",
+        "👤   🗝️.     ",
+        "👤    🗝️     ",
+        "👤    ✨🗝️    ",
+        "👤   ✨ 🗝️   ",
+        "👤  ✨  🗝️  ",
+        "👤 ✨   🗝️ "
     ]
 };
