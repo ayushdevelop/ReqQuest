@@ -1,5 +1,5 @@
 {
-  "name": "reqquest",
+  "name": "reqquest-cli",
   "version": "1.1.0",
   "description": "AI-powered terminal companion that turns natural language into API requests",
   "main": "./dist/index.js",
