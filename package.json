@@ -1,27 +1,42 @@
 {
   "name": "reqquest",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.1.0",
+  "description": "AI-powered terminal companion that turns natural language into API requests",
+  "main": "./dist/index.js",
   "bin": {
     "reqquest": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
-  "scripts": {
-    "dev": "tsx --env-file=.env src/index.ts",
-    "build": "tsc",
-    "prepare": "npm run build"
+  "engines": {
+    "node": ">=18.0.0"
   },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "api",
+    "ai",
+    "natural-language",
+    "http",
+    "rest",
+    "terminal",
+    "groq",
+    "gemini",
+    "openai",
+    "developer-tools"
+  ],
+  "author": "Ayush",
+  "license": "MIT",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ayushdevelop/ReqQuest.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "bugs": {
     "url": "https://github.com/ayushdevelop/ReqQuest/issues"
   },
@@ -30,6 +45,7 @@
     "axios": "^1.18.0",
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
+    "dotenv": "^16.4.5",
     "ora": "^9.4.0",
     "zod": "^4.4.3"
   },

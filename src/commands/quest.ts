@@ -3,21 +3,22 @@ import ora from "ora";
 
 import { companions, defaultCompanion } from "../companion/index.js";
 import { executeRequest } from "../http/executeRequest.js";
-import { generateRequest } from "../llm/llmGenerator.js";
+import { generateRequest, checkApiKeys } from "../llm/llmGenerator.js";
 import { displayRequest } from "../utils/requestDisplay.js";
 import { askConfirmation } from "../utils/confirmation.js";
 import { appendEntry, generateId } from "../history/store.js";
 
-// Helper to select a random message from a companion's list
 function randomMessage(messages: string[]): string {
     if (!messages.length) return "";
-    const index = Math.floor(Math.random() * messages.length);
-    return messages[index] || "";
+    return messages[Math.floor(Math.random() * messages.length)] ?? "";
 }
 
 export async function runQuest(prompt: string, companionType?: string) {
+    // Fail fast with a clear message if no API key is set
+    checkApiKeys();
+
     const companion = companionType
-        ? (companions[companionType.toLowerCase()] || defaultCompanion)
+        ? (companions[companionType.toLowerCase()] ?? defaultCompanion)
         : defaultCompanion;
 
     // Generate request config from prompt (uses LLM or falls back to mock)
@@ -88,6 +89,7 @@ export async function runQuest(prompt: string, companionType?: string) {
         );
     } catch (error: any) {
         const status = error.response?.status;
+        const apiMsg = error.response?.data?.message ?? error.response?.data?.error;
 
         spinner.fail(`${companion.name}: ${randomMessage(companion.errorMessages)}`);
 
@@ -102,6 +104,13 @@ export async function runQuest(prompt: string, companionType?: string) {
             companion: companion.name.toLowerCase(),
         });
 
-        console.error(error);
+        // Clean error output — no stack traces
+        if (status) {
+            console.error(chalk.red(`\n  ✗ Request failed with status ${status}${apiMsg ? `: ${apiMsg}` : ""}\n`));
+        } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
+            console.error(chalk.red("\n  ✗ Network error: could not reach the server.\n"));
+        } else {
+            console.error(chalk.red(`\n  ✗ ${error.message}\n`));
+        }
     }
 }

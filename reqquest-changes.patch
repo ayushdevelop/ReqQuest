@@ -1,0 +1,1029 @@
+diff --git a/.npmignore b/.npmignore
+new file mode 100644
+index 0000000..934c0d7
+--- /dev/null
++++ b/.npmignore
+@@ -0,0 +1,4 @@
++src/
++tsconfig.json
++.env
++*.map
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..5bddd26
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,128 @@
++# ReqQuest ⚔️
++
++> Turn natural language into API requests — right from your terminal.
++
++```bash
++reqquest "get all posts from jsonplaceholder"
++reqquest "POST to https://api.example.com/users with body name=John email=john@example.com"
++reqquest "DELETE https://api.example.com/posts/42 with bearer token abc123"
++```
++
++ReqQuest uses an LLM (Groq, Gemini, or OpenAI) to parse your prompt into a structured HTTP request, shows you exactly what it's going to send, asks for confirmation, then executes it.
++
++---
++
++## Install
++
++```bash
++npm install -g reqquest
++```
++
++Requires **Node.js 18+**.
++
++---
++
++## Setup
++
++ReqQuest needs one API key to work. Pick whichever you have:
++
++| Provider | Key | Get one |
++|----------|-----|---------|
++| Groq | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) — free, fast ✓ |
++| Gemini | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) — free tier |
++| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) — paid |
++
++**Option 1 — config file (recommended, no shell edits needed):**
++
++```bash
++mkdir -p ~/.reqquest
++echo 'GROQ_API_KEY=your_key_here' >> ~/.reqquest/.env
++```
++
++**Option 2 — shell export:**
++
++```bash
++export GROQ_API_KEY=your_key_here
++```
++
++---
++
++## Usage
++
++### Run a quest
++
++```bash
++reqquest "get users from jsonplaceholder"
++reqquest "POST https://httpbin.org/post with body message=hello"
++reqquest "fetch https://api.github.com/users/torvalds"
++```
++
++ReqQuest shows the generated request and asks for confirmation before executing.
++
++### Choose a companion
++
++Pick your terminal spirit animal:
++
++```bash
++reqquest "get posts" --companion wizard    # Merlin (default)
++reqquest "get posts" --companion rogue     # Shadow
++reqquest "get posts" --companion samurai   # Kensei
++reqquest "get posts" --companion robot     # Unit-7
++```
++
++### View history
++
++```bash
++reqquest history               # list recent requests
++reqquest history --limit 50    # show more
++reqquest history clear         # wipe history
++```
++
++### Replay a past request
++
++```bash
++reqquest history               # find an ID
++reqquest replay mqxv50s        # prefix match — no need for full ID
++reqquest replay mqxv50s --companion rogue   # override companion
++```
++
++---
++
++## How it works
++
++1. Your prompt is sent to the LLM with a strict JSON schema
++2. The LLM returns a structured `RequestConfig` (method, url, headers, query, body)
++3. ReqQuest validates it with [Zod](https://zod.dev)
++4. You see the full request and confirm before anything is sent
++5. The request is executed with [axios](https://axios-http.com)
++6. The result (and every request) is saved to `~/.reqquest/history.json`
++
++---
++
++## Examples
++
++```bash
++# Simple GET
++reqquest "fetch current user from https://api.github.com/user with bearer token ghp_xxx"
++
++# POST with JSON body
++reqquest "POST to https://jsonplaceholder.typicode.com/posts title=Hello body=World userId=1"
++
++# Query parameters
++reqquest "GET https://api.example.com/search with query q=nodejs limit=10"
++
++# DELETE
++reqquest "delete post 5 from jsonplaceholder"
++```
++
++---
++
++## History file
++
++All executed requests are stored in `~/.reqquest/history.json`. Cancelled requests are only saved if you opt in when prompted. History is capped at 100 entries (newest first).
++
++---
++
++## License
++
++MIT
+diff --git a/package-lock.json b/package-lock.json
+index 47c2da3..059354f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -12,6 +12,7 @@
+         "axios": "^1.18.0",
+         "chalk": "^5.6.2",
+         "commander": "^15.0.0",
++        "dotenv": "^17.4.2",
+         "ora": "^9.4.0",
+         "zod": "^4.4.3"
+       },
+@@ -617,6 +618,18 @@
+         "node": ">=0.4.0"
+       }
+     },
++    "node_modules/dotenv": {
++      "version": "17.4.2",
++      "resolved": "https://registry.npmjs.org/dotenv/-/dotenv-17.4.2.tgz",
++      "integrity": "sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==",
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://dotenvx.com"
++      }
++    },
+     "node_modules/dunder-proto": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/dunder-proto/-/dunder-proto-1.0.1.tgz",
+diff --git a/package.json b/package.json
+index c5c5708..7db721a 100644
+--- a/package.json
++++ b/package.json
+@@ -1,23 +1,42 @@
+ {
+   "name": "reqquest",
+-  "version": "1.0.0",
+-  "description": "",
+-  "main": "index.js",
++  "version": "1.1.0",
++  "description": "AI-powered terminal companion that turns natural language into API requests",
++  "main": "./dist/index.js",
+   "bin": {
+     "reqquest": "./dist/index.js"
+   },
+   "scripts": {
+-    "dev": "tsx --env-file=.env src/index.ts",
+-    "build": "tsc"
++    "dev": "tsx src/index.ts",
++    "build": "tsc",
++    "prepublishOnly": "npm run build"
+   },
++  "files": [
++    "dist"
++  ],
++  "engines": {
++    "node": ">=18.0.0"
++  },
++  "keywords": [
++    "cli",
++    "api",
++    "ai",
++    "natural-language",
++    "http",
++    "rest",
++    "terminal",
++    "groq",
++    "gemini",
++    "openai",
++    "developer-tools"
++  ],
++  "author": "Ayush",
++  "license": "MIT",
++  "type": "module",
+   "repository": {
+     "type": "git",
+     "url": "git+https://github.com/ayushdevelop/ReqQuest.git"
+   },
+-  "keywords": [],
+-  "author": "",
+-  "license": "ISC",
+-  "type": "module",
+   "bugs": {
+     "url": "https://github.com/ayushdevelop/ReqQuest/issues"
+   },
+@@ -26,6 +45,7 @@
+     "axios": "^1.18.0",
+     "chalk": "^5.6.2",
+     "commander": "^15.0.0",
++    "dotenv": "^16.4.5",
+     "ora": "^9.4.0",
+     "zod": "^4.4.3"
+   },
+@@ -34,4 +54,4 @@
+     "tsx": "^4.22.4",
+     "typescript": "^6.0.3"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/commands/history.ts b/src/commands/history.ts
+new file mode 100644
+index 0000000..22ec1d4
+--- /dev/null
++++ b/src/commands/history.ts
+@@ -0,0 +1,97 @@
++import chalk from "chalk";
++import { clearHistory, loadHistory, type HistoryEntry } from "../history/store.js";
++import { askConfirmation } from "../utils/confirmation.js";
++
++function formatMethod(method: string): string {
++    const colors: Record<string, (s: string) => string> = {
++        GET: chalk.green,
++        POST: chalk.yellow,
++        PUT: chalk.blue,
++        PATCH: chalk.magenta,
++        DELETE: chalk.red,
++    };
++    const colorFn = colors[method] ?? chalk.white;
++    return colorFn(method.padEnd(6));
++}
++
++function formatStatus(entry: HistoryEntry): string {
++    if (entry.status === "cancelled") {
++        return chalk.gray("cancelled");
++    }
++    const code = entry.responseStatus;
++    if (!code) return chalk.gray("unknown");
++    if (code >= 200 && code < 300) return chalk.green(String(code));
++    if (code >= 300 && code < 400) return chalk.cyan(String(code));
++    if (code >= 400 && code < 500) return chalk.yellow(String(code));
++    return chalk.red(String(code));
++}
++
++function formatTimestamp(iso: string): string {
++    const d = new Date(iso);
++    return d.toLocaleString(undefined, {
++        month: "short",
++        day: "2-digit",
++        hour: "2-digit",
++        minute: "2-digit",
++    });
++}
++
++function truncate(str: string, max: number): string {
++    return str.length > max ? str.slice(0, max - 1) + "…" : str;
++}
++
++export async function runHistoryList(options: { limit?: string }) {
++    const entries = loadHistory();
++
++    if (entries.length === 0) {
++        console.log(chalk.gray("\n  No history yet. Run a quest first!\n"));
++        return;
++    }
++
++    const limit = options.limit ? parseInt(options.limit, 10) : 20;
++    const shown = entries.slice(0, limit);
++
++    console.log();
++    console.log(
++        chalk.bold(
++            `  ${"ID".padEnd(12)} ${"TIME".padEnd(14)} ${"METHOD".padEnd(8)} ${"STATUS".padEnd(10)} PROMPT`
++        )
++    );
++    console.log(chalk.gray("  " + "─".repeat(72)));
++
++    for (const entry of shown) {
++        const id = chalk.cyan(entry.id.padEnd(12));
++        const time = chalk.gray(formatTimestamp(entry.timestamp).padEnd(14));
++        const method = formatMethod(entry.request.method);
++        const status = formatStatus(entry).padEnd(10);
++        const prompt = chalk.white(truncate(entry.prompt, 36));
++        console.log(`  ${id} ${time} ${method} ${status} ${prompt}`);
++    }
++
++    if (entries.length > limit) {
++        console.log(chalk.gray(`\n  … and ${entries.length - limit} more. Use --limit to see more.`));
++    }
++
++    console.log();
++}
++
++export async function runHistoryClear() {
++    const entries = loadHistory();
++
++    if (entries.length === 0) {
++        console.log(chalk.gray("\n  History is already empty.\n"));
++        return;
++    }
++
++    const confirmed = await askConfirmation(
++        chalk.yellow(`\n  ⚠️  Clear all ${entries.length} history entries? (y/N): `)
++    );
++
++    if (!confirmed) {
++        console.log(chalk.blue("  Aborted. History untouched.\n"));
++        return;
++    }
++
++    clearHistory();
++    console.log(chalk.green("  ✓ History cleared.\n"));
++}
+diff --git a/src/commands/quest.ts b/src/commands/quest.ts
+index 31df64a..c73f081 100644
+--- a/src/commands/quest.ts
++++ b/src/commands/quest.ts
+@@ -3,46 +3,54 @@ import ora from "ora";
+ 
+ import { companions, defaultCompanion } from "../companion/index.js";
+ import { executeRequest } from "../http/executeRequest.js";
+-import { generateRequest } from "../llm/llmGenerator.js";
++import { generateRequest, checkApiKeys } from "../llm/llmGenerator.js";
+ import { displayRequest } from "../utils/requestDisplay.js";
+ import { askConfirmation } from "../utils/confirmation.js";
++import { appendEntry, generateId } from "../history/store.js";
+ 
+-// Helper to select a random message from a companion's list
+ function randomMessage(messages: string[]): string {
+     if (!messages.length) return "";
+-    const index = Math.floor(Math.random() * messages.length);
+-    return messages[index] || "";
++    return messages[Math.floor(Math.random() * messages.length)] ?? "";
+ }
+ 
+ export async function runQuest(prompt: string, companionType?: string) {
++    // Fail fast with a clear message if no API key is set
++    checkApiKeys();
++
+     const companion = companionType
+-        ? (companions[companionType.toLowerCase()] || defaultCompanion)
++        ? (companions[companionType.toLowerCase()] ?? defaultCompanion)
+         : defaultCompanion;
+ 
+-    // Generate request config from prompt (uses LLM or falls back to mock)
+     const requestConfig = await generateRequest(prompt);
+ 
+-    // Display the generated request detail
+     displayRequest(requestConfig);
+ 
+-    // Prompt the user for confirmation before executing the HTTP request
+     const confirmed = await askConfirmation(
+         chalk.yellow(`⚔️  ${companion.name} asks: Execute this request? (y/N): `)
+     );
+ 
+     if (!confirmed) {
+-        console.log(
+-            chalk.blue(`❄️  ${companion.name}: ${randomMessage(companion.cancelMessages)}`)
++        const saveIt = await askConfirmation(
++            chalk.gray("  Save this cancelled request to history? (y/N): ")
+         );
++        if (saveIt) {
++            appendEntry({
++                id: generateId(),
++                timestamp: new Date().toISOString(),
++                prompt,
++                request: requestConfig,
++                status: "cancelled",
++                companion: companion.name.toLowerCase(),
++            });
++            console.log(chalk.gray("  Saved to history.\n"));
++        }
++        console.log(chalk.blue(`❄️  ${companion.name}: ${randomMessage(companion.cancelMessages)}`));
+         return;
+     }
+ 
+     const spinner = ora({
+         text: `${companion.name}: ${randomMessage(companion.loadingMessages)}`,
+-        spinner: {
+-            interval: companion.spinnerInterval,
+-            frames: companion.spinnerFrames
+-        }
++        spinner: { interval: companion.spinnerInterval, frames: companion.spinnerFrames }
+     }).start();
+ 
+     try {
+@@ -52,14 +60,41 @@ export async function runQuest(prompt: string, companionType?: string) {
+             `${companion.name}: ${randomMessage(companion.successMessages)} ${response.status}`
+         );
+ 
+-        console.log(
+-            chalk.green(
+-                JSON.stringify(response.data, null, 2)
+-            )
+-        );
+-    } catch (error) {
++        appendEntry({
++            id: generateId(),
++            timestamp: new Date().toISOString(),
++            prompt,
++            request: requestConfig,
++            status: "executed",
++            responseStatus: response.status,
++            companion: companion.name.toLowerCase(),
++        });
++
++        console.log(chalk.green(JSON.stringify(response.data, null, 2)));
++
++    } catch (error: any) {
++        const status = error.response?.status;
++        const apiMsg = error.response?.data?.message ?? error.response?.data?.error;
++
+         spinner.fail(`${companion.name}: ${randomMessage(companion.errorMessages)}`);
+ 
+-        console.error(error);
++        appendEntry({
++            id: generateId(),
++            timestamp: new Date().toISOString(),
++            prompt,
++            request: requestConfig,
++            status: "executed",
++            responseStatus: status,
++            companion: companion.name.toLowerCase(),
++        });
++
++        // Clean error output — no stack traces
++        if (status) {
++            console.error(chalk.red(`\n  ✗ Request failed with status ${status}${apiMsg ? `: ${apiMsg}` : ""}\n`));
++        } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
++            console.error(chalk.red("\n  ✗ Network error: could not reach the server.\n"));
++        } else {
++            console.error(chalk.red(`\n  ✗ ${error.message}\n`));
++        }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/src/commands/replay.ts b/src/commands/replay.ts
+new file mode 100644
+index 0000000..afad758
+--- /dev/null
++++ b/src/commands/replay.ts
+@@ -0,0 +1,103 @@
++import chalk from "chalk";
++import ora from "ora";
++import { findEntryById } from "../history/store.js";
++import { executeRequest } from "../http/executeRequest.js";
++import { displayRequest } from "../utils/requestDisplay.js";
++import { askConfirmation } from "../utils/confirmation.js";
++import { companions, defaultCompanion } from "../companion/index.js";
++import { appendEntry, generateId } from "../history/store.js";
++
++export async function runReplay(id: string, options: { companion?: string }) {
++    const entry = findEntryById(id);
++
++    if (!entry) {
++        console.error(chalk.red(`\n  ✗ No history entry found matching ID: "${id}"\n`));
++        console.log(chalk.gray('  Run `reqquest history` to see available IDs.\n'));
++        process.exit(1);
++    }
++
++    const companion = options.companion
++        ? (companions[options.companion.toLowerCase()] ?? defaultCompanion)
++        : (entry.companion ? (companions[entry.companion] ?? defaultCompanion) : defaultCompanion);
++
++    console.log();
++    console.log(chalk.gray(`  Replaying entry ${chalk.cyan(entry.id)} from ${new Date(entry.timestamp).toLocaleString()}`));
++    console.log(chalk.gray(`  Original prompt: "${entry.prompt}"`));
++
++    displayRequest(entry.request);
++
++    const confirmed = await askConfirmation(
++        chalk.yellow(`⚔️  ${companion.name} asks: Re-execute this request? (y/N): `)
++    );
++
++    if (!confirmed) {
++        // Ask whether to save this cancelled replay
++        const saveIt = await askConfirmation(
++            chalk.gray("  Save this cancelled replay to history? (y/N): ")
++        );
++        if (saveIt) {
++            appendEntry({
++                id: generateId(),
++                timestamp: new Date().toISOString(),
++                prompt: `[replay] ${entry.prompt}`,
++                request: entry.request,
++                status: "cancelled",
++                companion: companion.name.toLowerCase(),
++            });
++            console.log(chalk.gray("  Saved to history.\n"));
++        }
++
++        const msgs = companion.cancelMessages;
++        const msg = msgs[Math.floor(Math.random() * msgs.length)];
++        console.log(chalk.blue(`❄️  ${companion.name}: ${msg}`));
++        return;
++    }
++
++    const frames = companion.spinnerFrames;
++    const loadMsgs = companion.loadingMessages;
++    const spinner = ora({
++        text: `${companion.name}: ${loadMsgs[Math.floor(Math.random() * loadMsgs.length)]}`,
++        spinner: {
++            interval: companion.spinnerInterval,
++            frames,
++        }
++    }).start();
++
++    try {
++        const response = await executeRequest(entry.request);
++
++        spinner.succeed(
++            `${companion.name}: ${companion.successMessages[Math.floor(Math.random() * companion.successMessages.length)]} ${response.status}`
++        );
++
++        appendEntry({
++            id: generateId(),
++            timestamp: new Date().toISOString(),
++            prompt: `[replay] ${entry.prompt}`,
++            request: entry.request,
++            status: "executed",
++            responseStatus: response.status,
++            companion: companion.name.toLowerCase(),
++        });
++
++        console.log(chalk.green(JSON.stringify(response.data, null, 2)));
++    } catch (error: any) {
++        const status = error.response?.status;
++
++        spinner.fail(
++            `${companion.name}: ${companion.errorMessages[Math.floor(Math.random() * companion.errorMessages.length)]}`
++        );
++
++        appendEntry({
++            id: generateId(),
++            timestamp: new Date().toISOString(),
++            prompt: `[replay] ${entry.prompt}`,
++            request: entry.request,
++            status: "executed",
++            responseStatus: status,
++            companion: companion.name.toLowerCase(),
++        });
++
++        console.error(error);
++    }
++}
+diff --git a/src/history/store.ts b/src/history/store.ts
+new file mode 100644
+index 0000000..7beeca1
+--- /dev/null
++++ b/src/history/store.ts
+@@ -0,0 +1,69 @@
++import fs from "fs";
++import os from "os";
++import path from "path";
++import { type RequestConfig } from "../schemas/requestSchema.js";
++
++export type RequestStatus = "executed" | "cancelled";
++
++export interface HistoryEntry {
++    id: string;
++    timestamp: string;
++    prompt: string;
++    request: RequestConfig;
++    status: RequestStatus;
++    responseStatus?: number;
++    companion?: string;
++}
++
++const HISTORY_DIR = path.join(os.homedir(), ".reqquest");
++const HISTORY_FILE = path.join(HISTORY_DIR, "history.json");
++const MAX_HISTORY = 100;
++
++function ensureHistoryDir(): void {
++    if (!fs.existsSync(HISTORY_DIR)) {
++        fs.mkdirSync(HISTORY_DIR, { recursive: true });
++    }
++}
++
++export function loadHistory(): HistoryEntry[] {
++    ensureHistoryDir();
++    if (!fs.existsSync(HISTORY_FILE)) {
++        return [];
++    }
++    try {
++        const raw = fs.readFileSync(HISTORY_FILE, "utf-8");
++        return JSON.parse(raw) as HistoryEntry[];
++    } catch {
++        return [];
++    }
++}
++
++export function saveHistory(entries: HistoryEntry[]): void {
++    ensureHistoryDir();
++    fs.writeFileSync(HISTORY_FILE, JSON.stringify(entries, null, 2), "utf-8");
++}
++
++export function appendEntry(entry: HistoryEntry): void {
++    const entries = loadHistory();
++    entries.unshift(entry); // newest first
++    const trimmed = entries.slice(0, MAX_HISTORY);
++    saveHistory(trimmed);
++}
++
++export function clearHistory(): void {
++    ensureHistoryDir();
++    saveHistory([]);
++}
++
++export function generateId(): string {
++    // Short, human-readable ID: timestamp base36 + 3 random chars
++    const ts = Date.now().toString(36);
++    const rand = Math.random().toString(36).slice(2, 5);
++    return `${ts}${rand}`;
++}
++
++export function findEntryById(id: string): HistoryEntry | undefined {
++    const entries = loadHistory();
++    // Support prefix matching so users can type short IDs
++    return entries.find(e => e.id === id || e.id.startsWith(id));
++}
+diff --git a/src/index.ts b/src/index.ts
+index c300ec4..f8b84d6 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,18 +1,62 @@
+ #!/usr/bin/env node
+ 
+ import { Command } from "commander";
+-
++import { loadUserEnv } from "./utils/loadEnv.js";
+ import { runQuest } from "./commands/quest.js";
++import { runHistoryList, runHistoryClear } from "./commands/history.js";
++import { runReplay } from "./commands/replay.js";
++
++// Load ~/.reqquest/.env before anything else
++loadUserEnv();
+ 
+ const program = new Command();
+ 
+ program
+     .name("reqquest")
+-    .description("AI-powered API companion")
++    .description("AI-powered terminal companion that turns natural language into API requests")
++    .version("1.1.0");
++
++// Main quest command — default: reqquest "get all users"
++program
++    .command("quest <prompt>", { isDefault: true })
++    .description("Turn a natural language prompt into an API request")
+     .option("-c, --companion <type>", "companion personality: wizard, rogue, samurai, robot", "wizard")
+-    .argument("<prompt>")
+-    .action(async (prompt, options) => {
++    .action(async (prompt: string, options: { companion?: string }) => {
+         await runQuest(prompt, options.companion);
+     });
+ 
+-program.parse();
+\ No newline at end of file
++// History — reqquest history OR reqquest history list
++const historyCmd = program
++    .command("history")
++    .description("View and manage request history")
++    .option("-l, --limit <n>", "number of entries to show", "20")
++    .action(async (options: { limit?: string }) => {
++        // reqquest history (no subcommand) → show list
++        await runHistoryList(options);
++    });
++
++historyCmd
++    .command("list")
++    .description("List past requests")
++    .option("-l, --limit <n>", "number of entries to show", "20")
++    .action(async (options: { limit?: string }) => {
++        await runHistoryList(options);
++    });
++
++historyCmd
++    .command("clear")
++    .description("Clear all history")
++    .action(async () => {
++        await runHistoryClear();
++    });
++
++// Replay — reqquest replay <id>
++program
++    .command("replay <id>")
++    .description("Re-execute a request from history by ID (prefix match supported)")
++    .option("-c, --companion <type>", "override companion personality")
++    .action(async (id: string, options: { companion?: string }) => {
++        await runReplay(id, options);
++    });
++
++program.parse();
+diff --git a/src/llm/llmGenerator.ts b/src/llm/llmGenerator.ts
+index bf89e2f..eec9221 100644
+--- a/src/llm/llmGenerator.ts
++++ b/src/llm/llmGenerator.ts
+@@ -1,7 +1,6 @@
+ import axios from "axios";
+ import chalk from "chalk";
+ import { type RequestConfig, RequestSchema } from "../schemas/requestSchema.js";
+-import { generateMockRequest } from "../utils/mockGenerator.js";
+ 
+ const SYSTEM_INSTRUCTION = `You are an API client generator companion. You convert natural language descriptions of API operations into a structured JSON configuration representing an HTTP request.
+ 
+@@ -20,48 +19,51 @@ Rules:
+ 3. If the prompt has headers (e.g. "header authorization bearer xyz"), map them to the 'headers' object.
+ 4. Output raw JSON only. Do not include markdown code block formatting (such as \`\`\`json).`;
+ 
+-/**
+- * Generates an API RequestConfig from a natural language prompt.
+- * First checks for GEMINI_API_KEY or OPENAI_API_KEY in the environment.
+- * If keys are present, queries the respective LLM and validates the output using Zod.
+- * If keys are absent or API queries fail, falls back to the local MockGenerator.
+- */
++export function checkApiKeys(): void {
++    const hasKey =
++        process.env["GROQ_API_KEY"] ||
++        process.env["GEMINI_API_KEY"] ||
++        process.env["OPENAI_API_KEY"];
++
++    if (!hasKey) {
++        console.error(chalk.red("\n  ✗ No API key found.\n"));
++        console.error(
++            chalk.white("  ReqQuest needs one of the following to generate requests:\n")
++        );
++        console.error(
++            [
++                chalk.cyan("  GROQ_API_KEY  ") + chalk.gray(" → https://console.groq.com        (free, fast — recommended)"),
++                chalk.cyan("  GEMINI_API_KEY") + chalk.gray(" → https://aistudio.google.com     (free tier)"),
++                chalk.cyan("  OPENAI_API_KEY") + chalk.gray(" → https://platform.openai.com     (paid)"),
++            ].join("\n")
++        );
++        console.error(chalk.white("\n  Option 1 — set it in your shell:"));
++        console.error(chalk.gray("    export GROQ_API_KEY=your_key_here\n"));
++        console.error(chalk.white("  Option 2 — create a config file (no shell edits needed):"));
++        console.error(chalk.gray("    mkdir -p ~/.reqquest"));
++        console.error(chalk.gray("    echo 'GROQ_API_KEY=your_key_here' >> ~/.reqquest/.env\n"));
++        process.exit(1);
++    }
++}
++
+ export async function generateRequest(prompt: string): Promise<RequestConfig> {
+     const groqKey = process.env["GROQ_API_KEY"];
+     const geminiKey = process.env["GEMINI_API_KEY"];
+     const openaiKey = process.env["OPENAI_API_KEY"];
+ 
+-    if (!groqKey && !geminiKey && !openaiKey) {
+-        console.warn(
+-            chalk.yellow(
+-                "⚠️  No GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY found in environment variables. Falling back to offline Mock Generator."
+-            )
+-        );
+-        return generateMockRequest(prompt);
+-    }
+-
+     let rawJson = "";
+ 
+     try {
+         if (groqKey) {
+-            // Use Groq API (OpenAI compatible endpoint)
+             const response = await axios.post(
+                 "https://api.groq.com/openai/v1/chat/completions",
+                 {
+                     model: "llama-3.3-70b-versatile",
+                     messages: [
+-                        {
+-                            role: "system",
+-                            content: SYSTEM_INSTRUCTION
+-                        },
+-                        {
+-                            role: "user",
+-                            content: `Translate this prompt into a RequestConfig JSON: "${prompt}"`
+-                        }
++                        { role: "system", content: SYSTEM_INSTRUCTION },
++                        { role: "user", content: `Translate this prompt into a RequestConfig JSON: "${prompt}"` }
+                     ],
+-                    response_format: {
+-                        type: "json_object"
+-                    }
++                    response_format: { type: "json_object" }
+                 },
+                 {
+                     headers: {
+@@ -72,94 +74,51 @@ export async function generateRequest(prompt: string): Promise<RequestConfig> {
+             );
+ 
+             const content = response.data?.choices?.[0]?.message?.content;
+-            if (!content) {
+-                throw new Error("Empty response from Groq API");
+-            }
++            if (!content) throw new Error("Empty response from Groq API");
+             rawJson = content;
++
+         } else if (geminiKey) {
+-            // Use Gemini API
+             const response = await axios.post(
+                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                 {
+-                    contents: [
+-                        {
+-                            parts: [
+-                                {
+-                                    text: `Translate this prompt into an API RequestConfig JSON object. Do not include markdown code block formatting, return raw JSON only. Prompt: "${prompt}"`
+-                                }
+-                            ]
+-                        }
+-                    ],
++                    contents: [{
++                        parts: [{
++                            text: `Translate this prompt into an API RequestConfig JSON object. Do not include markdown code block formatting, return raw JSON only. Prompt: "${prompt}"`
++                        }]
++                    }],
+                     generationConfig: {
+                         responseMimeType: "application/json",
+                         responseSchema: {
+                             type: "OBJECT",
+                             properties: {
+-                                method: {
+-                                    type: "STRING",
+-                                    enum: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+-                                },
+-                                url: {
+-                                    type: "STRING"
+-                                },
+-                                headers: {
+-                                    type: "OBJECT",
+-                                    additionalProperties: {
+-                                        type: "STRING"
+-                                    }
+-                                },
+-                                query: {
+-                                    type: "OBJECT",
+-                                    additionalProperties: {
+-                                        type: "STRING"
+-                                    }
+-                                },
+-                                body: {
+-                                    type: "STRING"
+-                                }
++                                method: { type: "STRING", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
++                                url: { type: "STRING" },
++                                headers: { type: "OBJECT", additionalProperties: { type: "STRING" } },
++                                query: { type: "OBJECT", additionalProperties: { type: "STRING" } },
++                                body: { type: "STRING" }
+                             },
+                             required: ["method", "url"]
+                         }
+                     },
+-                    systemInstruction: {
+-                        parts: [
+-                            {
+-                                text: SYSTEM_INSTRUCTION
+-                            }
+-                        ]
+-                    }
++                    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] }
+                 },
+-                {
+-                    headers: {
+-                        "Content-Type": "application/json"
+-                    }
+-                }
++                { headers: { "Content-Type": "application/json" } }
+             );
+ 
+             const textResponse = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+-            if (!textResponse) {
+-                throw new Error("Empty response from Gemini API");
+-            }
++            if (!textResponse) throw new Error("Empty response from Gemini API");
+             rawJson = textResponse;
++
+         } else if (openaiKey) {
+-            // Use OpenAI API
+             const response = await axios.post(
+                 "https://api.openai.com/v1/chat/completions",
+                 {
+                     model: "gpt-4o-mini",
+                     messages: [
+-                        {
+-                            role: "system",
+-                            content: SYSTEM_INSTRUCTION
+-                        },
+-                        {
+-                            role: "user",
+-                            content: `Translate this prompt into a RequestConfig JSON: "${prompt}"`
+-                        }
++                        { role: "system", content: SYSTEM_INSTRUCTION },
++                        { role: "user", content: `Translate this prompt into a RequestConfig JSON: "${prompt}"` }
+                     ],
+-                    response_format: {
+-                        type: "json_object"
+-                    }
++                    response_format: { type: "json_object" }
+                 },
+                 {
+                     headers: {
+@@ -170,48 +129,46 @@ export async function generateRequest(prompt: string): Promise<RequestConfig> {
+             );
+ 
+             const content = response.data?.choices?.[0]?.message?.content;
+-            if (!content) {
+-                throw new Error("Empty response from OpenAI API");
+-            }
++            if (!content) throw new Error("Empty response from OpenAI API");
+             rawJson = content;
+         }
+ 
+         // Parse LLM output
+         const parsed = JSON.parse(rawJson);
+ 
+-        // Parse body if it is returned as a stringified JSON object
++        // Parse body if returned as stringified JSON
+         if (parsed.body && typeof parsed.body === "string") {
+-            const trimmedBody = parsed.body.trim();
+-            if (trimmedBody.startsWith("{") || trimmedBody.startsWith("[")) {
+-                try {
+-                    parsed.body = JSON.parse(trimmedBody);
+-                } catch {
+-                    // Fail-safe: leave as string if it isn't valid JSON
+-                }
++            const trimmed = parsed.body.trim();
++            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
++                try { parsed.body = JSON.parse(trimmed); } catch { /* leave as string */ }
+             }
+         }
+ 
+-        // Validate using Zod Schema
++        // Validate with Zod
+         const validated = RequestSchema.safeParse(parsed);
+         if (!validated.success) {
+-            console.warn(
+-                chalk.yellow(
+-                    "⚠️  LLM response validation failed. Falling back to offline Mock Generator. Errors:\n" +
+-                    validated.error.issues.map(e => ` - ${e.path.join(".")}: ${e.message}`).join("\n")
+-                )
+-            );
+-            return generateMockRequest(prompt);
++            const issues = validated.error.issues
++                .map(e => `  - ${e.path.join(".")}: ${e.message}`)
++                .join("\n");
++            console.error(chalk.red(`\n  ✗ LLM returned an invalid request structure:\n${issues}\n`));
++            process.exit(1);
+         }
+ 
+         return validated.data;
+ 
+     } catch (error: any) {
+-        const errMsg = error.response?.data?.error?.message || error.message || error;
+-        console.warn(
+-            chalk.yellow(
+-                `⚠️  LLM Generator failed (${errMsg}). Falling back to Mock Generator.`
+-            )
+-        );
+-        return generateMockRequest(prompt);
++        // Surface API errors clearly without stack traces
++        const apiMsg = error.response?.data?.error?.message;
++        const status = error.response?.status;
++
++        if (apiMsg || status) {
++            console.error(chalk.red(`\n  ✗ API error${status ? ` (${status})` : ""}: ${apiMsg ?? error.message}\n`));
++        } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
++            console.error(chalk.red("\n  ✗ Network error: could not reach the API. Check your connection.\n"));
++        } else {
++            console.error(chalk.red(`\n  ✗ ${error.message}\n`));
++        }
++
++        process.exit(1);
+     }
+ }
+diff --git a/src/utils/loadEnv.ts b/src/utils/loadEnv.ts
+new file mode 100644
+index 0000000..8b83659
+--- /dev/null
++++ b/src/utils/loadEnv.ts
+@@ -0,0 +1,15 @@
++import path from "path";
++import os from "os";
++import fs from "fs";
++import { config } from "dotenv";
++
++/**
++ * Loads ~/.reqquest/.env if it exists, before any API key checks run.
++ * This lets users set keys once without touching their shell profile.
++ */
++export function loadUserEnv(): void {
++    const envPath = path.join(os.homedir(), ".reqquest", ".env");
++    if (fs.existsSync(envPath)) {
++        config({ path: envPath });
++    }
++}
