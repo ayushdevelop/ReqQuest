@@ -6,6 +6,7 @@ import { executeRequest } from "../http/executeRequest.js";
 import { generateRequest } from "../llm/llmGenerator.js";
 import { displayRequest } from "../utils/requestDisplay.js";
 import { askConfirmation } from "../utils/confirmation.js";
+import { appendEntry, generateId } from "../history/store.js";
 
 // Helper to select a random message from a companion's list
 function randomMessage(messages: string[]): string {
@@ -31,6 +32,23 @@ export async function runQuest(prompt: string, companionType?: string) {
     );
 
     if (!confirmed) {
+        // Ask whether to save this cancelled request to history
+        const saveIt = await askConfirmation(
+            chalk.gray("  Save this cancelled request to history? (y/N): ")
+        );
+
+        if (saveIt) {
+            appendEntry({
+                id: generateId(),
+                timestamp: new Date().toISOString(),
+                prompt,
+                request: requestConfig,
+                status: "cancelled",
+                companion: companion.name.toLowerCase(),
+            });
+            console.log(chalk.gray("  Saved to history.\n"));
+        }
+
         console.log(
             chalk.blue(`❄️  ${companion.name}: ${randomMessage(companion.cancelMessages)}`)
         );
@@ -52,13 +70,37 @@ export async function runQuest(prompt: string, companionType?: string) {
             `${companion.name}: ${randomMessage(companion.successMessages)} ${response.status}`
         );
 
+        // Save executed request to history
+        appendEntry({
+            id: generateId(),
+            timestamp: new Date().toISOString(),
+            prompt,
+            request: requestConfig,
+            status: "executed",
+            responseStatus: response.status,
+            companion: companion.name.toLowerCase(),
+        });
+
         console.log(
             chalk.green(
                 JSON.stringify(response.data, null, 2)
             )
         );
-    } catch (error) {
+    } catch (error: any) {
+        const status = error.response?.status;
+
         spinner.fail(`${companion.name}: ${randomMessage(companion.errorMessages)}`);
+
+        // Save failed request to history too — useful for debugging
+        appendEntry({
+            id: generateId(),
+            timestamp: new Date().toISOString(),
+            prompt,
+            request: requestConfig,
+            status: "executed",
+            responseStatus: status,
+            companion: companion.name.toLowerCase(),
+        });
 
         console.error(error);
     }
