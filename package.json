@@ -4,7 +4,7 @@
   "description": "AI-powered terminal companion that turns natural language into API requests",
   "main": "./dist/index.js",
   "bin": {
-    "reqquest": "./dist/index.js"
+    "reqquest": "dist/index.js"
   },
   "files": [
     "dist"
