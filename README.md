@@ -15,7 +15,7 @@ ReqQuest uses an LLM (Groq, Gemini, or OpenAI) to parse your prompt into a struc
 ## Install
 
 ```bash
-npm install -g reqquest
+npm install -g reqquest-cli
 ```
 
 Requires **Node.js 18+**.
